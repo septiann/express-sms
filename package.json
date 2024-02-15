@@ -1,0 +1,29 @@
+{
+  "name": "sms_v1",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server",
+    "server": "nodemon server",
+    "dev": "concurrently \"npm run server\" \"npm run client\" \"npm run scss\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@yaireo/tagify": "^4.21.1",
+    "config": "^3.3.11",
+    "dotenv": "^16.4.4",
+    "express": "^4.18.2",
+    "mysql2": "^3.9.1",
+    "sequelize": "^6.37.0",
+    "slugify": "^1.6.6",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "morgan": "^1.10.0",
+    "nodemon": "^3.0.3"
+  }
+}
