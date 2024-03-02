@@ -11,7 +11,8 @@ const sequelize = new Sequelize(dbConfig.DB, dbConfig.USER, dbConfig.PASSWORD, {
         min: dbConfig.pool.min,
         acquire: dbConfig.pool.acquire,
         idle: dbConfig.pool.idle,
-    }
+    },
+    timezone: 'Asia/Jakarta'
 });
 
 const db = {};
@@ -20,5 +21,9 @@ db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
 db.courses = require("./courses.model")(sequelize, Sequelize);
+db.classes = require("./classes.model")(sequelize, Sequelize);
+db.users = require("./users.model")(sequelize, Sequelize);
+db.students = require("./students.model")(sequelize, Sequelize);
+db.students_courses = require("./students_courses.model")(sequelize, Sequelize);
 
 module.exports = db;
