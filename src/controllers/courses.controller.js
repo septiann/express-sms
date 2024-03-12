@@ -1,180 +1,194 @@
 const db = require("../models/");
 const Courses = db.courses;
 const Op = db.Sequelize.Op;
-const slugify = require("slugify");
-const { v4 } = require("uuid");
+const helper = require("../utils/helper.util");
 
-// Membuat dan menyimpan Course baru
+const getLastCoursesByClass = async (courseType, classCode) => {
+    try {
+        const data = await db.sequelize.query(`SELECT (SUBSTR(course_code,7,3)) AS last_code, (SUBSTR(course_code,4,2)) AS class
+        FROM courses
+        WHERE 1 = 1 
+        AND course_code LIKE '${courseType}-${classCode}-%'
+        ORDER BY last_code DESC, class DESC
+        LIMIT 1 `, {
+            type: db.sequelize.QueryTypes.SELECT
+        });
+
+        return data;
+    } catch (error) {
+        console.error(error);
+
+        return "";
+    }
+};
+
 exports.create = async (req, res) => {
-    // Validation
-    if (!req.body.course_name || !req.body.course_student) {
-        return res.status(400).json({
-            status: "E",
-            message: "Content cannot be empty!",
-        });
+    const lastCourseCode = await getLastCoursesByClass(req.body.course_type_id, req.body.class);
+    const nextNumber = helper.getNextNumber(lastCourseCode);
+    let course_code = `${req.body.course_type_id}-${req.body.class}-${nextNumber}`; // ex: 01-10-001 | 01 = General, 02 = IPA, 03 = IPS
+
+    const course = {
+        course_code: course_code,
+        course_name: req.body.course_name,
+        course_desc: req.body.course_desc,
+        status: req.body.status,
+        created_by: req.body.created_by
     }
 
-    // Action
-    try {
-        const slug = slugify(req.body.course_name + '-' + req.body.course_student).toLowerCase();
-        const uuid = v4();
-
-        const course = {
-            uid: uuid,
-            course_name: req.body.course_name,
-            course_student: req.body.course_student,
-            slug: slug
-        }
-
-        await Courses.create(course)
-            .then(data => {
-                res.status(201).json({
-                    "status": "S",
-                    "message": "Course created successfully.",
-                    "data": data
-                });
-            }).catch(err => {
-                console.error(err);
-
-                res.status(500).json({
-                    "status": "E",
-                    "message": "Some error occurred while creating the Course."
-                });
-            });
-    } catch (error) {
-        console.error(error);
-
-        return res.status(500).json({
-            "status": "E",
-            "message": "Internal Server Error: " + error.message,
-            "data": null
+    await Courses.create(course)
+    .then(data => {
+        return res.status(200).json({
+            message: "Successfully created a new course.",
+            data: data
         });
-    }
+    }).catch(err => {
+        return res.status(500).send({
+            message: err.message || "Some error occurred while creating a new course."
+        });
+    });
 };
 
-// Mendapatkan semua data Courses dari database
 exports.findAll = async (req, res) => {
-    const courseStudent = req.query.course_student;
-    let condition = courseStudent ? { course_student: `${courseStudent}`} : null;
+    let conditions = {};
 
-    try {
-        await Courses.findAll({ where: condition })
-            .then(data => {
-                if (data.length === 0) throw 0;
-
-                res.status(200).json({
-                    "status": "S",
-                    "message": "Courses retrieved successfully.",
-                    "data": data
-                });
-            }).catch(err => {
-                console.error(err);
-
-                let httpStatusCode = 500;
-                let msg = "Some error occured while retrieving Courses.";
-
-                if (err === 0) {
-                    httpStatusCode = 404;
-                    msg = "Courses not found with Course Student: " + courseStudent;
-                }
-
-                res.status(httpStatusCode).json({
-                    "status": "E",
-                    "message": msg,
-                    "data": null
-                });
-            });
-    } catch (error) {
-        console.error(error);
-
-        return res.status(500).json({
-            "status": "E",
-            "message": "Internal Server Error: " + error.message,
-            "data": null
-        });
+    if (req.query.course_code) {
+        conditions.course_code = req.query.course_code;
     }
-};
+    if (req.query.course_name) {
+        conditions.course_name = { [Op.like]: '%'+ req.query.course_name +'%' };
+    }
+    if (req.query.status) {
+        conditions.status = req.query.status === 'active' ? 'active' : 'inactive';
+    }
+    if (req.query.course_class) {
+        conditions.course_code = { [Op.like]: '%-'+ req.query.course_class +'-%' };
+    }
 
-// Mendapatkan data single Course with UUID
-exports.findOne = async (req, res) => {
-    const uid = req.params.uid;
-
-    await Courses.findOne({ where: { uid: `${uid}` }})
-        .then(data => {
-            if (data) {
-                res.status(200).json({
-                    "status": "S",
-                    "message": `Course retrieved successfully.`,
-                    "data": data
-                });
-            } else {
-                res.status(404).json({
-                    "status": "E",
-                    "message": `Course not found.`,
-                    "data": null
-                });
-            }
-        }).catch(err => {
-            res.status(500).json({
-                "status": "E",
-                "message": "Internal Server Error: " + err.message,
-                "data": null
+    await Courses.findAll({
+        where: conditions
+    }).then(data => {
+        if (data.length == 0) {
+            res.status(404).send({
+                message: "Couldn't find any courses"
             });
-        });
-};
-
-// Update Course berdasarkan UID di request
-exports.update = (req, res) => {
-    const uid = req.params.uid;
-
-    try {
-        // Get Course first
-        const courseObj = Courses.findOne({
-            where: {
-                uid: uid
-            }
-        });
-
-        // Validation
-        if (!courseObj) {
-            throw "Course not found";
+        } else {
+            res.status(200).send(data);
         }
+    }).catch(err => {
+        res.status(500).send({
+            message: err.message || "Some error occurred while retrieving courses."
+        });
+    });
+};
 
-        req.body.slug = slugify(req.body.course_name + '-' + req.body.course_student).toLowerCase();
+exports.findOne = async (req, res) => {
+    const course_code = req.params.course_code;
 
-        // Action
-        Courses.update(req.body, {
-            where: { uid: uid }
-        }).then(status => {
-            console.log(status);
+    await Courses.findOne({ where: { course_code: course_code }})
+    .then(data => {
+        if (!data) {
+            res.status(404).send({
+                message: "No course found"
+            });
+        } else {
+            res.status(200).send(data);
+        }
+    }).catch(err => {
+        res.status(500).send({
+            message: err.message || "Some error occurred while retrieving course."
+        });
+    });
+};
 
-            if (status == 1) {
-                res.status(200).json({
-                    "status": "S",
-                    "message": "Course was updated successfully."
-                });
-            } else {
-                res.status(500).json({
-                    "status": "E",
-                    "message": `Cannot update Course!`
-                });
-            }
+exports.update = async (req, res) => {
+    const course_id = req.params.id;
+    
+    await Courses.findOne({
+        where: {
+            course_id: course_id
+        }
+    })
+    .then(async () => {
+        await Courses.update(req.body, {
+            where: { course_id: course_id }
+        }).then(() => {
+            res.status(200).send({
+                message: "Successfully updated the course."
+            });
         }).catch(err => {
-            console.error(err);
-
-            res.status(500).json({
-                "status": "E",
-                "message": "Error updating Tutorial: " + err.message,
-                "data": null
+            res.status(500).send({
+                message: "Failed to update course. " + err.message
             });
         });
-    } catch (error) {
-        console.error(error);
+    })
+    .catch(err => {
+        return res.status(404).send({
+            message: 'Course not found',
+        });
+    });
+}
 
+exports.delete = async (req, res) => {
+    const course_id = req.params.id;
+
+    await Courses.findOne({
+        where: {
+            course_id: course_id
+        }
+    }).then(async () => {
+        await Courses.destroy({
+            where: {
+                course_id: course_id
+            }
+        }).then(() => {
+            res.status(200).send({
+                message: "Successfully deleted the class."
+            });
+        });
+    }).catch(error => {
+        res.status(404).send({
+            message: "Failed to delete class. " + error.message
+        });
+    });
+};
+
+/* exports.deleteAll = async (req, res) => {
+    await Courses.destroy({
+        where: {},
+        truncate: false
+    }).then(nums => {
+        res.status(200).json({
+            "status": "S",
+            "message": `${nums} Course(s) were deleted successfully!`
+        });
+    }).catch(err => {
         res.status(500).json({
             "status": "E",
-            "message": "Internal Server Error: " + error.message,
-            "data": null
+            "message": "Something was wrong. Err: " + err.message
         });
-    }
-}
+    });
+};
+
+exports.findByCondition = async (req, res) => {
+    const className = req.query.class ? req.query.class : "";
+    const status = req.query.status;
+
+    await Courses.findAll({
+        where: {
+            course_student: className,
+            status: status
+        }
+    }).then(data => {
+        res.status(200).json({
+            "status": "S",
+            "message": "Course retrieved successfully.",
+            "data": data
+        });
+    }).catch(err => {
+        res.status(500).json({
+            "status": "E",
+            "message": "Something was wrong. Err: " + err.message,
+            "data": data
+        });
+    });
+}; */
