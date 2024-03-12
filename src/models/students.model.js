@@ -1,21 +1,28 @@
 module.exports = (sequelize, Sequelize) => {
-    const Courses = sequelize.define("courses", {
-        course_id: {
+    const Students = sequelize.define("students", {
+        student_id: {
             type: Sequelize.BIGINT,
             primaryKey: true,
             autoIncrement: true
         },
-        course_code: {
+        full_name: {
+            type: Sequelize.STRING,
+            allowNull: false
+        },
+        nis: {
             type: Sequelize.STRING,
             unique: true,
             allowNull: false
         },
-        course_name: {
-            type: Sequelize.STRING,
-            allowNull: false
+        dob: {
+            type: Sequelize.DATEONLY,
         },
-        course_desc: {
-            type: Sequelize.TEXT,
+        pob: {
+            type: Sequelize.STRING,
+        },
+        user_id: {
+            type: Sequelize.BIGINT,
+            allowNull: false
         },
         status: {
             type: Sequelize.STRING,
@@ -33,5 +40,5 @@ module.exports = (sequelize, Sequelize) => {
         updatedAt: 'updated_at'
     });
 
-    return Courses;
+    return Students;
 }

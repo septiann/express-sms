@@ -7,11 +7,11 @@ const helper = require("../utils/helper.util");
 
 const getLastClassCodeByMajor = async (major) => {
     try {
-        const data = await db.sequelize.query(`SELECT (SUBSTR(class_code,5,3)) AS last_class_code 
+        const data = await db.sequelize.query(`SELECT (SUBSTR(class_code,5,3)) AS last_code 
         FROM classes
         WHERE 1 = 1 
         AND major = :major
-        ORDER BY last_class_code DESC 
+        ORDER BY last_code DESC 
         LIMIT 1 `, {
             replacements: { major: major },
             type: db.sequelize.QueryTypes.SELECT
@@ -126,58 +126,50 @@ exports.update = async (req, res) => {
         req.body.slug = newSlug.toLowerCase();
     }
 
-    try {
-        await Classes.findOne({
-            where: { 
-                uuid: uuid 
-            }
-        }).then(async () => {
-            await Classes.update(req.body, {
-                where: { uuid: uuid },
-                returning: true
-            }).then(data => {
-                console.log(data);
-
-                res.status(200).send({
-                    message: "Successfully updated the class."
-                });
-            }).catch(err => {
-                throw new Error("Failed to update class. " + err.message);
+    await Classes.findOne({
+        where: { 
+            uuid: uuid 
+        }
+    }).then(async () => {
+        await Classes.update(req.body, {
+            where: { uuid: uuid },
+            returning: true
+        }).then(data => {
+            res.status(200).send({
+                message: "Successfully updated the class."
             });
         }).catch(err => {
-            throw new Error("No class found. " + err.message);
+            res.status(500).send({
+                message: "Failed to update class. " + err.message
+            });
         });
-    } catch (error) {
+    }).catch(err => {
         res.status(500).send({
-            message: error.message
+            message: "No class found. " + err.message
         });
-    }
+    });
 };
 
 exports.delete = async (req, res) => {
-    try {
-        const uuid = req.params.uuid;
+    const uuid = req.params.uuid;
 
-        await Classes.findOne({
+    await Classes.findOne({
+        where: {
+            uuid: uuid
+        }
+    }).then(async () => {
+        await Classes.destroy({
             where: {
                 uuid: uuid
             }
-        }).then(async () => {
-            await Classes.destroy({
-                where: {
-                    uuid: uuid
-                }
-            }).then(() => {
-                res.status(200).send({
-                    message: "Successfully deleted the class."
-                });
+        }).then(() => {
+            res.status(200).send({
+                message: "Successfully deleted the class."
             });
-        }).catch(error => {
-            throw new Error("Failed to delete class. " + error.message);
         });
-    } catch (error) {
-        res.status(500).send({
-            message: error.message
+    }).catch(error => {
+        res.status(404).send({
+            message: "Failed to delete class. " + error.message
         });
-    }
+    });
 };
